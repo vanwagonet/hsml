@@ -1,4 +1,34 @@
-const { Parser } = require("acorn")
+"use strict"
+const acorn = require("acorn")
+const { Parser, tokContexts: tc, tokTypes: tt } = acorn
+
+tt.hsmlSelfClose = new acorn.TokenType("/>", { beforeExpr: true })
+tt.hsmlEndTag = new acorn.TokenType(">", { beforeExpr: true })
+tc.hsmlAttribute = new acorn.TokContext("hsmlAttribute")
+
+acorn.plugins.hsml = function(instance, opts) {
+  if (!opts) {
+    return
+  }
+
+  instance.options.plugins.hsml = {}
+
+  instance.extend("readToken", function(inner) {
+    return function(code) {
+      if (this.curContext() === tc.hsmlAttribute) {
+        if (code === 47 && this.input.charCodeAt(this.pos + 1) === 62) {
+          this.pos += 2
+          return this.finishToken(tt.hsmlSelfClose)
+        }
+        if (code === 62) {
+          this.pos += 1
+          return this.finishToken(tt.hsmlEndTag)
+        }
+      }
+      return inner.call(this, code)
+    }
+  })
+}
 
 exports.parse = function parse(input, options) {
   const ctx = {
@@ -7,9 +37,6 @@ exports.parse = function parse(input, options) {
     column: 0,
     input,
     options: {
-      ecmaVersion: 2017,
-      sourceType: "module",
-      locations: true,
       ...options
     }
   }
@@ -120,18 +147,23 @@ function Element(ctx) {
     advance(ctx)
     advance(ctx)
   } else {
-    if (input[ctx.offset] !== ">") throw new Error()
+    if (input[ctx.offset] !== ">") {
+      throw new Error("Expected tag end '>'")
+    }
     advance(ctx)
 
     skipWhitespace(ctx)
     children = List(Child, OptWhitespace, ctx)
     skipWhitespace(ctx)
 
-    if (input.slice(ctx.offset, ctx.offset + 2) !== "</") throw new Error()
+    if (input.slice(ctx.offset, ctx.offset + 2) !== "</") {
+      throw new Error(`Expected closing tag '</${tagName}>'`)
+    }
     advance(ctx)
     advance(ctx)
-    if (input.slice(ctx.offset, ctx.offset + tagName.length) !== tagName)
-      throw new Error()
+    if (input.slice(ctx.offset, ctx.offset + tagName.length) !== tagName) {
+      throw new Error(`Expected closing tag '</${tagName}>'`)
+    }
     advance(ctx, tagName.length)
     if (input[ctx.offset] !== ">") throw new Error()
     advance(ctx)
@@ -180,14 +212,15 @@ function Attribute(ctx) {
 }
 
 function Value(ctx) {
-  const parser = new Parser(ctx.options, ctx.input, ctx.offset)
+  const parser = new Parser({
+    ecmaVersion: 2017,
+    sourceType: "module",
+    locations: true,
+    plugins: { hsml: true }
+  }, ctx.input, ctx.offset)
+  parser.context.push(tc.hsmlAttribute)
   parser.nextToken()
-  let value
-  try {
-    value = parser.parseMaybeUnary()
-  } catch (err) {
-    throw new Error("Couldn't parse the attribute value, complex expressions need ().")
-  }
+  const value = parser.parseExpression()
   const advanceTo = parser.start - 1
   while (ctx.offset < advanceTo) {
     advance(ctx)
@@ -197,6 +230,51 @@ function Value(ctx) {
 
 function Child(ctx) {
   if (ctx.input.slice(ctx.offset, ctx.offset + 2) === "</") return
-  const element = Element(ctx)
-  if (element) return element
+  return (
+    Element(ctx) ||
+    Placeholder(ctx) ||
+    Text(ctx)
+  )
+}
+
+function Placeholder(ctx) {
+  if (ctx.input.slice(ctx.offset, ctx.offset + 2) !== '${') return
+  advance(ctx)
+  advance(ctx)
+  const parser = new Parser({
+    ecmaVersion: 2017,
+    sourceType: "module",
+    locations: true
+  }, ctx.input, ctx.offset)
+  parser.nextToken()
+  const expression = parser.parseExpression()
+  const advanceTo = parser.start
+  while (ctx.offset < advanceTo) {
+    advance(ctx)
+  }
+  if (ctx.input[ctx.offset] !== '}') {
+    throw new Error("Expected placeholder end '}'")
+  }
+  advance(ctx)
+  return expression
+}
+
+function Text(ctx) {
+  const start = getPosition(ctx)
+  const s = ctx.offset
+  while (
+    ctx.input[ctx.offset] !== '<' &&
+    ctx.input[ctx.offset] !== '\n' &&
+    ctx.input.slice(ctx.offset, ctx.offset + 2) !== '${'
+  ) {
+    advance(ctx)
+  }
+  const end = getPosition(ctx)
+  const e = ctx.offset
+  if (s === e) return
+  return {
+    type: "Literal",
+    loc: { start, end },
+    value: ctx.input.slice(s, e)
+  }
 }

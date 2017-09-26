@@ -1,5 +1,7 @@
+"use strict"
+
 const assert = require("assert")
-const { parse } = require("../index")
+const { parse } = require("../parse")
 
 function removeLoc(obj) {
   if (!obj || typeof obj !== "object") return obj
@@ -123,6 +125,81 @@ describe("parse", () => {
               tagName: "c",
               attributes: [],
               children: null
+            }
+          ]
+        }
+      ]
+    })
+  })
+
+  it("parses child text", () => {
+    assert.deepEqual(removeLoc(parse("<a>hello<b/>world</a>", {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "a",
+          attributes: [],
+          children: [
+            {
+              type: "Literal",
+              value: "hello"
+            },
+            {
+              type: "HSMLElement",
+              tagName: "b",
+              attributes: [],
+              children: null
+            },
+            {
+              type: "Literal",
+              value: "world"
+            }
+          ]
+        }
+      ]
+    })
+  })
+
+  it("parses each line of child text individually", () => {
+    assert.deepEqual(removeLoc(parse("<a>\nhello\nworld\n</a>", {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "a",
+          attributes: [],
+          children: [
+            {
+              type: "Literal",
+              value: "hello"
+            },
+            {
+              type: "Literal",
+              value: "world"
+            }
+          ]
+        }
+      ]
+    })
+  })
+
+  it("parses child text placeholder expressions", () => {
+    assert.deepEqual(removeLoc(parse("<a>hello ${place}</a>", {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "a",
+          attributes: [],
+          children: [
+            {
+              type: "Literal",
+              value: "hello "
+            },
+            {
+              type: "Identifier",
+              name: "place"
             }
           ]
         }

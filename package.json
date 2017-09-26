@@ -7,7 +7,7 @@
   "author": "Andy VanWagoner <andy@thetalecrafter.com>",
   "license": "BSD-2-Clause",
   "scripts": {
-    "prettier": "prettier src/**/*.{js,css} *.js --no-semi --write",
+    "prettier": "prettier 'src/**/*.{js,css}' *.js --no-semi --write",
     "test": "mocha 'src/**/__tests__/*.test.js'"
   },
   "dependencies": {

@@ -1,5 +1,6 @@
+"use strict"
 const assert = require("assert")
-const { parse } = require("../index")
+const { parse } = require("../parse")
 
 function removeLoc(obj) {
   if (!obj || typeof obj !== "object") return obj
@@ -225,7 +226,7 @@ describe("parse attribute", () => {
   })
 
   it("parses regular expression attributes", () => {
-    assert.deepEqual(removeLoc(parse(`<reg exp=/.*/gi />`, {})), {
+    assert.deepEqual(removeLoc(parse(`<reg exp=/./gi />`, {})), {
       type: "HSML",
       body: [
         {
@@ -237,11 +238,89 @@ describe("parse attribute", () => {
               name: "exp",
               value: {
                 type: "Literal",
-                value: /.*/gi,
-                raw: "/.*/gi",
+                value: /./gi,
+                raw: "/./gi",
                 regex: {
-                  pattern: ".*",
+                  pattern: ".",
                   flags: "gi"
+                }
+              }
+            }
+          ],
+          children: null
+        }
+      ]
+    })
+  })
+
+  it("throws if a bare regex starts with >", () => {
+    assert.throws(() => {
+      parse(`<reg exp=/>/ />`, {})
+    })
+  })
+
+  it("allows regex that looks like close inside parens", () => {
+    assert.deepEqual(removeLoc(parse(`<reg exp=(/>/) />`, {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "reg",
+          attributes: [
+            {
+              type: "HSMLAttribute",
+              name: "exp",
+              value: {
+                type: "Literal",
+                value: />/,
+                raw: "/>/",
+                regex: {
+                  pattern: ">",
+                  flags: ""
+                }
+              }
+            }
+          ],
+          children: null
+        }
+      ]
+    })
+  })
+
+  it("allows regex that looks like close inside function", () => {
+    assert.deepEqual(removeLoc(parse(`<reg exp=() => {/>/} />`, {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "reg",
+          attributes: [
+            {
+              type: "HSMLAttribute",
+              name: "exp",
+              value: {
+                type: "ArrowFunctionExpression",
+                id: null,
+                params: [],
+                async: false,
+                generator: false,
+                expression: false,
+                body: {
+                  type: "BlockStatement",
+                  body: [
+                    {
+                      type: "ExpressionStatement",
+                      expression: {
+                        type: "Literal",
+                        value: />/,
+                        raw: "/>/",
+                        regex: {
+                          pattern: ">",
+                          flags: ""
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -324,6 +403,136 @@ describe("parse attribute", () => {
                   name: "fn"
                 },
                 arguments: []
+              }
+            }
+          ],
+          children: null
+        }
+      ]
+    })
+  })
+
+  it("parses function expression attributes", () => {
+    assert.deepEqual(removeLoc(parse(`<input value=function*(){} />`, {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "input",
+          attributes: [
+            {
+              type: "HSMLAttribute",
+              name: "value",
+              value: {
+                type: "FunctionExpression",
+                id: null,
+                params: [],
+                async: false,
+                generator: true,
+                expression: false,
+                body: {
+                  type: "BlockStatement",
+                  body: []
+                }
+              }
+            }
+          ],
+          children: null
+        }
+      ]
+    })
+  })
+
+  it("parses arrow function attributes", () => {
+    assert.deepEqual(removeLoc(parse(`<input value=async () => {} />`, {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "input",
+          attributes: [
+            {
+              type: "HSMLAttribute",
+              name: "value",
+              value: {
+                type: "ArrowFunctionExpression",
+                id: null,
+                params: [],
+                async: true,
+                generator: false,
+                expression: false,
+                body: {
+                  type: "BlockStatement",
+                  body: []
+                }
+              }
+            }
+          ],
+          children: null
+        }
+      ]
+    })
+  })
+
+  it("parses array literal attributes", () => {
+    assert.deepEqual(removeLoc(parse(`<a array=[ 'a' ] />`, {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "a",
+          attributes: [
+            {
+              type: "HSMLAttribute",
+              name: "array",
+              value: {
+                type: "ArrayExpression",
+                elements: [
+                  {
+                    type: "Literal",
+                    value: "a",
+                    raw: "'a'"
+                  }
+                ]
+              }
+            }
+          ],
+          children: null
+        }
+      ]
+    })
+  })
+
+  it("parses object literal attributes", () => {
+    assert.deepEqual(removeLoc(parse(`<o obj={ p } />`, {})), {
+      type: "HSML",
+      body: [
+        {
+          type: "HSMLElement",
+          tagName: "o",
+          attributes: [
+            {
+              type: "HSMLAttribute",
+              name: "obj",
+              value: {
+                type: "ObjectExpression",
+                properties: [
+                  {
+                    type: "Property",
+                    kind: "init",
+                    computed: false,
+                    method: false,
+                    shorthand: true,
+                    key: {
+                      type: "Identifier",
+                      name: "p"
+                    },
+                    value: {
+                      type: "Identifier",
+                      name: "p"
+                    }
+                  }
+                ]
               }
             }
           ],
