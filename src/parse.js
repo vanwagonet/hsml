@@ -7,9 +7,7 @@ tt.hsmlEndTag = new acorn.TokenType(">", { beforeExpr: true })
 tc.hsmlAttribute = new acorn.TokContext("hsmlAttribute")
 
 acorn.plugins.hsml = function(instance, opts) {
-  if (!opts) {
-    return
-  }
+  if (!opts) return
 
   instance.options.plugins.hsml = {}
 
@@ -45,7 +43,7 @@ exports.Parser = class Parser {
 
   advance(count = 1) {
     if (this.offset + count > this.input.length) {
-      throw new Error("Cannot advance passed the end of the input")
+      throw new Error("Unexpected end of file")
     }
     while (count > 0) {
       count -= 1
@@ -120,20 +118,37 @@ exports.Parser = class Parser {
     return this.offset > start
   }
 
+  parseList(parse, delimit) {
+    const list = []
+    let node
+    while ((node = parse.call(this))) {
+      list.push(node)
+      if (delimit && !delimit.call(this)) break
+    }
+    return list
+  }
+
   parse() {
-    const start = this.getPosition()
     this.skipWhitespace()
+    const start = this.getPosition()
     const body = this.parseList(this.parseTopElement, this.skipWhitespace)
+    const end = this.getPosition()
     this.skipWhitespace()
     return {
       type: "HSML",
-      loc: { start, end: this.getPosition() },
+      loc: { start, end },
       body
     }
   }
 
   parseTopElement() {
-    return this.parseDoctype() || this.parseComment() || this.parseElement()
+    return (
+      this.parseDoctype() ||
+      this.parseComment() ||
+      this.parseElement() ||
+      this.parsePlaceholder() ||
+      this.parseText()
+    )
   }
 
   parseDoctype() {
@@ -167,9 +182,9 @@ exports.Parser = class Parser {
   }
 
   parseComment() {
-    const s = this.offset
     const start = this.getPosition()
     if (!this.eat("<!--")) return
+    const s = this.offset
     while (this.input.slice(this.offset, this.offset + 3) !== "-->") {
       this.advance()
     }
@@ -180,18 +195,6 @@ exports.Parser = class Parser {
       loc: { start, end: this.getPosition() },
       data: this.input.slice(s, e)
     }
-  }
-
-  parseList(parse, delimit) {
-    const list = []
-    let node
-    while ((node = parse.call(this))) {
-      list.push(node)
-      if (delimit && !delimit.call(this)) {
-        return list
-      }
-    }
-    return list
   }
 
   parseElement() {
@@ -261,7 +264,9 @@ exports.Parser = class Parser {
     parser.context.push(tc.hsmlAttribute)
     parser.nextToken()
     const value = parser.parseExpression()
-    const advanceTo = parser.start - 1
+    let advanceTo = parser.start
+    // Whitespace between attributes is required, so don't skip all of it.
+    if (this.isWhitespace(this.input[advanceTo - 1])) advanceTo -= 1
     this.advance(advanceTo - this.offset)
     return value
   }
@@ -282,7 +287,8 @@ exports.Parser = class Parser {
       {
         ecmaVersion: 2017,
         sourceType: "module",
-        locations: true
+        locations: true,
+        plugins: { hsml: false }
       },
       this.input,
       this.offset
@@ -298,18 +304,18 @@ exports.Parser = class Parser {
     const start = this.getPosition()
     const s = this.offset
     while (
+      this.offset < this.input.length &&
       this.input[this.offset] !== "<" &&
       this.input[this.offset] !== "\n" &&
       this.input.slice(this.offset, this.offset + 2) !== "${"
     ) {
       this.advance()
     }
-    return s === this.offset
-      ? undefined
-      : {
-          type: "Literal",
-          loc: { start, end: this.getPosition() },
-          value: this.input.slice(s, this.offset)
-        }
+    if (s === this.offset) return
+    return {
+      type: "Literal",
+      loc: { start, end: this.getPosition() },
+      value: this.input.slice(s, this.offset)
+    }
   }
 }

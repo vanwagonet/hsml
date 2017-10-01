@@ -1,0 +1,19 @@
+{
+  "check-coverage": true,
+  "per-file": true,
+  "lines": 100,
+  "functions": 100,
+  "branches": 100,
+  "include": [
+    "src/**/*.js"
+  ],
+  "exclude": [
+    "src/**/__tests__/*.test.js"
+  ],
+  "reporter": [
+    "html",
+    "text-summary"
+  ],
+  "cache": true,
+  "all": true
+}

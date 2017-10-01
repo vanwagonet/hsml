@@ -185,7 +185,7 @@ describe("parse", () => {
   })
 
   it("parses child text placeholder expressions", () => {
-    assert.deepEqual(removeLoc(parse("<a>hello ${place}</a>")), {
+    assert.deepEqual(removeLoc(parse("<a>hello ${ place }</a>")), {
       type: "HSML",
       body: [
         {
@@ -205,5 +205,42 @@ describe("parse", () => {
         }
       ]
     })
+  })
+
+  it("parses many kinds of whitespace", () => {
+    assert.deepEqual(
+      parse(
+        `\ufeff<a
+        \t\v\r\n\f
+        \u0085
+        \u00A0
+        \u180e
+        \u2000\u2005\u200d
+        \u2028\u2029
+        \u202f\u205f
+        \u2060
+        \u3000
+      />`
+      ),
+      {
+        type: "HSML",
+        loc: {
+          start: { line: 1, column: 1 },
+          end: { line: 12, column: 8 }
+        },
+        body: [
+          {
+            type: "HSMLElement",
+            loc: {
+              start: { line: 1, column: 1 },
+              end: { line: 12, column: 8 }
+            },
+            tagName: "a",
+            attributes: [],
+            children: null
+          }
+        ]
+      }
+    )
   })
 })

@@ -82,4 +82,12 @@ describe("parse doctype", () => {
   it("throws when appears as a child", () => {
     assert.throws(() => parse("<a><!doctype html></a>"))
   })
+
+  it("throws when unclosed before end of input", () => {
+    assert.throws(() => parse("<!doctype html"))
+  })
+
+  it("throws when expected whitespace is missing", () => {
+    assert.throws(() => parse("<!doctypehtml>"))
+  })
 })

@@ -8,13 +8,14 @@
   "license": "BSD-2-Clause",
   "scripts": {
     "prettier": "prettier 'src/**/*.{js,css}' *.js --no-semi --write",
-    "test": "mocha 'src/**/__tests__/*.test.js'"
+    "test": "nyc mocha 'src/**/__tests__/*.test.js'"
   },
   "dependencies": {
     "acorn": "^5.1.1"
   },
   "devDependencies": {
     "mocha": "^3.5.0",
+    "nyc": "^11.2.1",
     "prettier": "^1.5.3"
   }
 }

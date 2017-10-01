@@ -69,7 +69,7 @@ describe("parse attribute", () => {
 
   it("parses number attributes", () => {
     assert.deepEqual(
-      removeLoc(parse(`<n b=0b01 o=0o7 h=0xaf d=123.456 p=+1 n=-2 />`)),
+      removeLoc(parse(`<n b=0b01 o=0o7 h=0xaf d=123.456 p=+1 n=-2></n>`)),
       {
         type: "HSML",
         body: [
@@ -142,7 +142,7 @@ describe("parse attribute", () => {
                 }
               }
             ],
-            children: null
+            children: []
           }
         ]
       }
