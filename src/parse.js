@@ -44,6 +44,9 @@ exports.parse = function parse(input, options) {
 }
 
 function advance(ctx, count = 1) {
+  if (ctx.offset + count > ctx.input.length) {
+    throw new Error("Cannot advance passed the end of input")
+  }
   while (count > 0) {
     count -= 1
     if (ctx.input[ctx.offset] === "\n") {
@@ -109,13 +112,65 @@ function OptWhitespace(ctx) {
 function HSML(ctx) {
   const start = getPosition(ctx)
   skipWhitespace(ctx)
-  const body = List(Element, OptWhitespace, ctx)
+  const body = List(TopElement, OptWhitespace, ctx)
   skipWhitespace(ctx)
   const end = getPosition(ctx)
   return {
     type: "HSML",
     loc: { start, end },
     body
+  }
+}
+
+function TopElement(ctx) {
+  return Doctype(ctx) || Comment(ctx) || Element(ctx)
+}
+
+function Doctype(ctx) {
+  if (ctx.input.slice(ctx.offset, ctx.offset + 9).toLowerCase() !== "<!doctype")
+    return
+  const s = ctx.offset
+  const start = getPosition(ctx)
+  advance(ctx, 2)
+  const tagName = Name(ctx)
+  skipWhitespace(ctx)
+  const name = Name(ctx)
+  skipWhitespace(ctx)
+  while (ctx.input[ctx.offset] !== ">") {
+    advance(ctx)
+  }
+  if (
+    ctx.input[ctx.offset] !== ">" ||
+    tagName.toLowerCase() !== "doctype" ||
+    !name
+  ) {
+    throw new Error("Invalid doctype")
+  }
+  advance(ctx)
+  const end = getPosition(ctx)
+  return {
+    type: "HSMLDoctype",
+    loc: { start, end },
+    name,
+    raw: ctx.input.slice(s, ctx.offset)
+  }
+}
+
+function Comment(ctx) {
+  if (ctx.input.slice(ctx.offset, ctx.offset + 4) !== "<!--") return
+  const start = getPosition(ctx)
+  advance(ctx, 4)
+  const s = ctx.offset
+  while (ctx.input.slice(ctx.offset, ctx.offset + 3) !== "-->") {
+    advance(ctx)
+  }
+  const e = ctx.offset
+  advance(ctx, 3)
+  const end = getPosition(ctx)
+  return {
+    type: "HSMLComment",
+    loc: { start, end },
+    data: ctx.input.slice(s, e)
   }
 }
 
@@ -144,8 +199,7 @@ function Element(ctx) {
   skipWhitespace(ctx)
   let children = null
   if (input.slice(ctx.offset, ctx.offset + 2) === "/>") {
-    advance(ctx)
-    advance(ctx)
+    advance(ctx, 2)
   } else {
     if (input[ctx.offset] !== ">") {
       throw new Error("Expected tag end '>'")
@@ -159,8 +213,7 @@ function Element(ctx) {
     if (input.slice(ctx.offset, ctx.offset + 2) !== "</") {
       throw new Error(`Expected closing tag '</${tagName}>'`)
     }
-    advance(ctx)
-    advance(ctx)
+    advance(ctx, 2)
     if (input.slice(ctx.offset, ctx.offset + tagName.length) !== tagName) {
       throw new Error(`Expected closing tag '</${tagName}>'`)
     }
@@ -212,47 +265,45 @@ function Attribute(ctx) {
 }
 
 function Value(ctx) {
-  const parser = new Parser({
-    ecmaVersion: 2017,
-    sourceType: "module",
-    locations: true,
-    plugins: { hsml: true }
-  }, ctx.input, ctx.offset)
+  const parser = new Parser(
+    {
+      ecmaVersion: 2017,
+      sourceType: "module",
+      locations: true,
+      plugins: { hsml: true }
+    },
+    ctx.input,
+    ctx.offset
+  )
   parser.context.push(tc.hsmlAttribute)
   parser.nextToken()
   const value = parser.parseExpression()
   const advanceTo = parser.start - 1
-  while (ctx.offset < advanceTo) {
-    advance(ctx)
-  }
+  advance(ctx, advanceTo - ctx.offset)
   return value
 }
 
 function Child(ctx) {
   if (ctx.input.slice(ctx.offset, ctx.offset + 2) === "</") return
-  return (
-    Element(ctx) ||
-    Placeholder(ctx) ||
-    Text(ctx)
-  )
+  return Comment(ctx) || Element(ctx) || Placeholder(ctx) || Text(ctx)
 }
 
 function Placeholder(ctx) {
-  if (ctx.input.slice(ctx.offset, ctx.offset + 2) !== '${') return
-  advance(ctx)
-  advance(ctx)
-  const parser = new Parser({
-    ecmaVersion: 2017,
-    sourceType: "module",
-    locations: true
-  }, ctx.input, ctx.offset)
+  if (ctx.input.slice(ctx.offset, ctx.offset + 2) !== "${") return
+  advance(ctx, 2)
+  const parser = new Parser(
+    {
+      ecmaVersion: 2017,
+      sourceType: "module",
+      locations: true
+    },
+    ctx.input,
+    ctx.offset
+  )
   parser.nextToken()
   const expression = parser.parseExpression()
-  const advanceTo = parser.start
-  while (ctx.offset < advanceTo) {
-    advance(ctx)
-  }
-  if (ctx.input[ctx.offset] !== '}') {
+  advance(ctx, parser.start - ctx.offset)
+  if (ctx.input[ctx.offset] !== "}") {
     throw new Error("Expected placeholder end '}'")
   }
   advance(ctx)
@@ -263,9 +314,9 @@ function Text(ctx) {
   const start = getPosition(ctx)
   const s = ctx.offset
   while (
-    ctx.input[ctx.offset] !== '<' &&
-    ctx.input[ctx.offset] !== '\n' &&
-    ctx.input.slice(ctx.offset, ctx.offset + 2) !== '${'
+    ctx.input[ctx.offset] !== "<" &&
+    ctx.input[ctx.offset] !== "\n" &&
+    ctx.input.slice(ctx.offset, ctx.offset + 2) !== "${"
   ) {
     advance(ctx)
   }

@@ -14,7 +14,7 @@ function removeLoc(obj) {
 
 describe("parse", () => {
   it("parses a self-closing element", () => {
-    assert.deepEqual(parse("<tag-name />", {}), {
+    assert.deepEqual(parse("<tag-name />"), {
       type: "HSML",
       loc: {
         start: { line: 1, column: 0 },
@@ -36,7 +36,7 @@ describe("parse", () => {
   })
 
   it("parses an empty element", () => {
-    assert.deepEqual(parse("<tag-name></tag-name>", {}), {
+    assert.deepEqual(parse("<tag-name></tag-name>"), {
       type: "HSML",
       loc: {
         start: { line: 1, column: 0 },
@@ -58,7 +58,7 @@ describe("parse", () => {
   })
 
   it("parses sibling elements", () => {
-    assert.deepEqual(parse("<a/>\n<b/>", {}), {
+    assert.deepEqual(parse("<a/>\n<b/>"), {
       type: "HSML",
       loc: {
         start: { line: 1, column: 0 },
@@ -90,7 +90,7 @@ describe("parse", () => {
   })
 
   it("parses children elements", () => {
-    assert.deepEqual(parse("<a><b/><c/></a>", {}), {
+    assert.deepEqual(parse("<a><b/><c/></a>"), {
       type: "HSML",
       loc: {
         start: { line: 1, column: 0 },
@@ -133,7 +133,7 @@ describe("parse", () => {
   })
 
   it("parses child text", () => {
-    assert.deepEqual(removeLoc(parse("<a>hello<b/>world</a>", {})), {
+    assert.deepEqual(removeLoc(parse("<a>hello<b/>world</a>")), {
       type: "HSML",
       body: [
         {
@@ -162,7 +162,7 @@ describe("parse", () => {
   })
 
   it("parses each line of child text individually", () => {
-    assert.deepEqual(removeLoc(parse("<a>\nhello\nworld\n</a>", {})), {
+    assert.deepEqual(removeLoc(parse("<a>\nhello\nworld\n</a>")), {
       type: "HSML",
       body: [
         {
@@ -185,7 +185,7 @@ describe("parse", () => {
   })
 
   it("parses child text placeholder expressions", () => {
-    assert.deepEqual(removeLoc(parse("<a>hello ${place}</a>", {})), {
+    assert.deepEqual(removeLoc(parse("<a>hello ${place}</a>")), {
       type: "HSML",
       body: [
         {
