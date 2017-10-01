@@ -1,6 +1,6 @@
 "use strict"
 const acorn = require("acorn")
-const { Parser, tokContexts: tc, tokTypes: tt } = acorn
+const { tokContexts: tc, tokTypes: tt } = acorn
 
 tt.hsmlSelfClose = new acorn.TokenType("/>", { beforeExpr: true })
 tt.hsmlEndTag = new acorn.TokenType(">", { beforeExpr: true })
@@ -31,301 +31,285 @@ acorn.plugins.hsml = function(instance, opts) {
 }
 
 exports.parse = function parse(input, options) {
-  const ctx = {
-    offset: 0,
-    line: 1,
-    column: 0,
-    input,
-    options: {
-      ...options
+  return new exports.Parser(input, options).parse()
+}
+
+exports.Parser = class Parser {
+  constructor(input, options) {
+    this.offset = 0
+    this.line = 1
+    this.column = 0
+    this.input = input
+    this.options = { ...options }
+  }
+
+  advance(count = 1) {
+    if (this.offset + count > this.input.length) {
+      throw new Error("Cannot advance passed the end of the input")
+    }
+    while (count > 0) {
+      count -= 1
+      if (this.input[this.offset] === "\n") {
+        this.line += 1
+        this.column = 0
+      } else {
+        this.column += 1
+      }
+      this.offset += 1
     }
   }
-  return HSML(ctx)
-}
 
-function advance(ctx, count = 1) {
-  if (ctx.offset + count > ctx.input.length) {
-    throw new Error("Cannot advance passed the end of input")
-  }
-  while (count > 0) {
-    count -= 1
-    if (ctx.input[ctx.offset] === "\n") {
-      ctx.line += 1
-      ctx.column = 0
-    } else {
-      ctx.column += 1
+  eat(expected) {
+    const length = expected.length
+    if (this.input.slice(this.offset, this.offset + length) !== expected) {
+      return false
     }
-    ctx.offset += 1
+    this.advance(length)
+    return true
   }
-}
 
-function isValidNameChar(char) {
-  return (
-    (char >= "A" && char <= "Z") ||
-    (char >= "a" && char <= "z") ||
-    char === "-" ||
-    char === "_" ||
-    char === "$"
-  )
-}
-
-function isWhitespace(char) {
-  const code = char && char.charCodeAt(0)
-  return (
-    (code >= 0x09 && code <= 0x0d) ||
-    code === 0x20 ||
-    code === 0x85 ||
-    code === 0xa0 ||
-    code === 0x180e ||
-    (code >= 0x2000 && code <= 0x200d) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    code === 0x202f ||
-    code === 0x205f ||
-    code === 0x2060 ||
-    code === 0x3000 ||
-    code === 0xfeff
-  )
-}
-
-function skipWhitespace(ctx) {
-  while (isWhitespace(ctx.input[ctx.offset])) {
-    advance(ctx)
+  expect(expected) {
+    const length = expected.length
+    if (this.input.slice(this.offset, this.offset + length) !== expected) {
+      throw new Error(`Expected '${expected}'`)
+    }
+    this.advance(length)
   }
-}
 
-function getPosition({ line, column }) {
-  return { line, column }
-}
-
-function Whitespace(ctx) {
-  const start = ctx.offset
-  skipWhitespace(ctx)
-  return ctx.offset !== start
-}
-
-function OptWhitespace(ctx) {
-  skipWhitespace(ctx)
-  return true
-}
-
-function HSML(ctx) {
-  const start = getPosition(ctx)
-  skipWhitespace(ctx)
-  const body = List(TopElement, OptWhitespace, ctx)
-  skipWhitespace(ctx)
-  const end = getPosition(ctx)
-  return {
-    type: "HSML",
-    loc: { start, end },
-    body
+  isValidNameChar(char) {
+    return (
+      (char >= "A" && char <= "Z") ||
+      (char >= "a" && char <= "z") ||
+      char === "-" ||
+      char === "_" ||
+      char === "$"
+    )
   }
-}
 
-function TopElement(ctx) {
-  return Doctype(ctx) || Comment(ctx) || Element(ctx)
-}
+  isWhitespace(char) {
+    const code = char && char.charCodeAt(0)
+    return (
+      (code >= 0x09 && code <= 0x0d) ||
+      code === 0x20 ||
+      code === 0x85 ||
+      code === 0xa0 ||
+      code === 0x180e ||
+      (code >= 0x2000 && code <= 0x200d) ||
+      code === 0x2028 ||
+      code === 0x2029 ||
+      code === 0x202f ||
+      code === 0x205f ||
+      code === 0x2060 ||
+      code === 0x3000 ||
+      code === 0xfeff
+    )
+  }
 
-function Doctype(ctx) {
-  if (ctx.input.slice(ctx.offset, ctx.offset + 9).toLowerCase() !== "<!doctype")
-    return
-  const s = ctx.offset
-  const start = getPosition(ctx)
-  advance(ctx, 2)
-  const tagName = Name(ctx)
-  skipWhitespace(ctx)
-  const name = Name(ctx)
-  skipWhitespace(ctx)
-  while (ctx.input[ctx.offset] !== ">") {
-    advance(ctx)
+  skipWhitespace() {
+    while (this.isWhitespace(this.input[this.offset])) this.advance()
+    return true
   }
-  if (
-    ctx.input[ctx.offset] !== ">" ||
-    tagName.toLowerCase() !== "doctype" ||
-    !name
-  ) {
-    throw new Error("Invalid doctype")
-  }
-  advance(ctx)
-  const end = getPosition(ctx)
-  return {
-    type: "HSMLDoctype",
-    loc: { start, end },
-    name,
-    raw: ctx.input.slice(s, ctx.offset)
-  }
-}
 
-function Comment(ctx) {
-  if (ctx.input.slice(ctx.offset, ctx.offset + 4) !== "<!--") return
-  const start = getPosition(ctx)
-  advance(ctx, 4)
-  const s = ctx.offset
-  while (ctx.input.slice(ctx.offset, ctx.offset + 3) !== "-->") {
-    advance(ctx)
+  getPosition() {
+    return { line: this.line, column: this.column }
   }
-  const e = ctx.offset
-  advance(ctx, 3)
-  const end = getPosition(ctx)
-  return {
-    type: "HSMLComment",
-    loc: { start, end },
-    data: ctx.input.slice(s, e)
-  }
-}
 
-function List(Type, Separator, ctx) {
-  const list = []
-  let node
-  while ((node = Type(ctx))) {
-    list.push(node)
-    if (Separator) {
-      if (!Separator(ctx)) {
+  parseWhitespace() {
+    const start = this.offset
+    this.skipWhitespace()
+    return this.offset > start
+  }
+
+  parse() {
+    const start = this.getPosition()
+    this.skipWhitespace()
+    const body = this.parseList(this.parseTopElement, this.skipWhitespace)
+    this.skipWhitespace()
+    return {
+      type: "HSML",
+      loc: { start, end: this.getPosition() },
+      body
+    }
+  }
+
+  parseTopElement() {
+    return this.parseDoctype() || this.parseComment() || this.parseElement()
+  }
+
+  parseDoctype() {
+    if (
+      this.input.slice(this.offset, this.offset + 9).toLowerCase() !==
+      "<!doctype"
+    )
+      return
+    const s = this.offset
+    const start = this.getPosition()
+    this.advance(2)
+    const tagName = this.parseName()
+    this.skipWhitespace()
+    const name = this.parseName()
+    this.skipWhitespace()
+    while (this.input[this.offset] !== ">") this.advance()
+    if (
+      this.input[this.offset] !== ">" ||
+      tagName.toLowerCase() !== "doctype" ||
+      !name
+    ) {
+      throw new Error("Invalid doctype")
+    }
+    this.advance()
+    return {
+      type: "HSMLDoctype",
+      loc: { start, end: this.getPosition() },
+      name,
+      raw: this.input.slice(s, this.offset)
+    }
+  }
+
+  parseComment() {
+    const s = this.offset
+    const start = this.getPosition()
+    if (!this.eat("<!--")) return
+    while (this.input.slice(this.offset, this.offset + 3) !== "-->") {
+      this.advance()
+    }
+    const e = this.offset
+    this.expect("-->")
+    return {
+      type: "HSMLComment",
+      loc: { start, end: this.getPosition() },
+      data: this.input.slice(s, e)
+    }
+  }
+
+  parseList(parse, delimit) {
+    const list = []
+    let node
+    while ((node = parse.call(this))) {
+      list.push(node)
+      if (delimit && !delimit.call(this)) {
         return list
       }
     }
+    return list
   }
-  return list
-}
 
-function Element(ctx) {
-  const start = getPosition(ctx)
-  const { input } = ctx
-  if (input[ctx.offset] !== "<") return
-  advance(ctx)
-  const tagName = Name(ctx)
-  skipWhitespace(ctx)
-  const attributes = List(Attribute, Whitespace, ctx)
-  skipWhitespace(ctx)
-  let children = null
-  if (input.slice(ctx.offset, ctx.offset + 2) === "/>") {
-    advance(ctx, 2)
-  } else {
-    if (input[ctx.offset] !== ">") {
-      throw new Error("Expected tag end '>'")
+  parseElement() {
+    const start = this.getPosition()
+    if (!this.eat("<")) return
+    const tagName = this.parseName()
+    this.skipWhitespace()
+    const attributes = this.parseList(this.parseAttribute, this.parseWhitespace)
+    this.skipWhitespace()
+    let children = null
+    if (!this.eat("/>")) {
+      this.expect(">")
+      this.skipWhitespace()
+      children = this.parseList(this.parseChild, this.skipWhitespace)
+      this.skipWhitespace()
+      this.expect(`</${tagName}>`)
     }
-    advance(ctx)
-
-    skipWhitespace(ctx)
-    children = List(Child, OptWhitespace, ctx)
-    skipWhitespace(ctx)
-
-    if (input.slice(ctx.offset, ctx.offset + 2) !== "</") {
-      throw new Error(`Expected closing tag '</${tagName}>'`)
+    return {
+      type: "HSMLElement",
+      loc: { start, end: this.getPosition() },
+      tagName,
+      attributes,
+      children
     }
-    advance(ctx, 2)
-    if (input.slice(ctx.offset, ctx.offset + tagName.length) !== tagName) {
-      throw new Error(`Expected closing tag '</${tagName}>'`)
+  }
+
+  parseName() {
+    const start = this.offset
+    while (this.isValidNameChar(this.input[this.offset])) this.advance()
+    return this.input.slice(start, this.offset)
+  }
+
+  parseAttribute() {
+    const start = this.getPosition()
+    const name = this.parseName()
+    if (!name) return
+    const { offset, line, column } = this
+    this.skipWhitespace()
+    let value = { type: "Literal", value: true }
+    if (this.eat("=")) {
+      this.skipWhitespace()
+      value = this.parseValue()
+    } else {
+      this.offset = offset
+      this.line = line
+      this.column = column
     }
-    advance(ctx, tagName.length)
-    if (input[ctx.offset] !== ">") throw new Error()
-    advance(ctx)
+    return {
+      type: "HSMLAttribute",
+      loc: { start, end: this.getPosition() },
+      name,
+      value
+    }
   }
-  const end = getPosition(ctx)
-  return {
-    type: "HSMLElement",
-    loc: { start, end },
-    tagName,
-    attributes,
-    children
-  }
-}
 
-function Name(ctx) {
-  const start = ctx.offset
-  while (isValidNameChar(ctx.input[ctx.offset])) {
-    advance(ctx)
+  parseValue() {
+    const parser = new acorn.Parser(
+      {
+        ecmaVersion: 2017,
+        sourceType: "module",
+        locations: true,
+        plugins: { hsml: true }
+      },
+      this.input,
+      this.offset
+    )
+    parser.context.push(tc.hsmlAttribute)
+    parser.nextToken()
+    const value = parser.parseExpression()
+    const advanceTo = parser.start - 1
+    this.advance(advanceTo - this.offset)
+    return value
   }
-  return ctx.input.slice(start, ctx.offset)
-}
 
-function Attribute(ctx) {
-  const start = getPosition(ctx)
-  const name = Name(ctx)
-  if (!name) return
-  const { offset, line, column } = ctx
-  skipWhitespace(ctx)
-  let value = { type: "Literal", value: true }
-  if (ctx.input[ctx.offset] === "=") {
-    advance(ctx)
-    skipWhitespace(ctx)
-    value = Value(ctx)
-  } else {
-    ctx.offset = offset
-    ctx.line = line
-    ctx.column = column
+  parseChild() {
+    if (this.input.slice(this.offset, this.offset + 2) === "</") return
+    return (
+      this.parseComment() ||
+      this.parseElement() ||
+      this.parsePlaceholder() ||
+      this.parseText()
+    )
   }
-  const end = getPosition(ctx)
-  return {
-    type: "HSMLAttribute",
-    loc: { start, end },
-    name,
-    value
+
+  parsePlaceholder() {
+    if (!this.eat("${")) return
+    const parser = new acorn.Parser(
+      {
+        ecmaVersion: 2017,
+        sourceType: "module",
+        locations: true
+      },
+      this.input,
+      this.offset
+    )
+    parser.nextToken()
+    const expression = parser.parseExpression()
+    this.advance(parser.start - this.offset)
+    this.expect("}")
+    return expression
   }
-}
 
-function Value(ctx) {
-  const parser = new Parser(
-    {
-      ecmaVersion: 2017,
-      sourceType: "module",
-      locations: true,
-      plugins: { hsml: true }
-    },
-    ctx.input,
-    ctx.offset
-  )
-  parser.context.push(tc.hsmlAttribute)
-  parser.nextToken()
-  const value = parser.parseExpression()
-  const advanceTo = parser.start - 1
-  advance(ctx, advanceTo - ctx.offset)
-  return value
-}
-
-function Child(ctx) {
-  if (ctx.input.slice(ctx.offset, ctx.offset + 2) === "</") return
-  return Comment(ctx) || Element(ctx) || Placeholder(ctx) || Text(ctx)
-}
-
-function Placeholder(ctx) {
-  if (ctx.input.slice(ctx.offset, ctx.offset + 2) !== "${") return
-  advance(ctx, 2)
-  const parser = new Parser(
-    {
-      ecmaVersion: 2017,
-      sourceType: "module",
-      locations: true
-    },
-    ctx.input,
-    ctx.offset
-  )
-  parser.nextToken()
-  const expression = parser.parseExpression()
-  advance(ctx, parser.start - ctx.offset)
-  if (ctx.input[ctx.offset] !== "}") {
-    throw new Error("Expected placeholder end '}'")
-  }
-  advance(ctx)
-  return expression
-}
-
-function Text(ctx) {
-  const start = getPosition(ctx)
-  const s = ctx.offset
-  while (
-    ctx.input[ctx.offset] !== "<" &&
-    ctx.input[ctx.offset] !== "\n" &&
-    ctx.input.slice(ctx.offset, ctx.offset + 2) !== "${"
-  ) {
-    advance(ctx)
-  }
-  const end = getPosition(ctx)
-  const e = ctx.offset
-  if (s === e) return
-  return {
-    type: "Literal",
-    loc: { start, end },
-    value: ctx.input.slice(s, e)
+  parseText() {
+    const start = this.getPosition()
+    const s = this.offset
+    while (
+      this.input[this.offset] !== "<" &&
+      this.input[this.offset] !== "\n" &&
+      this.input.slice(this.offset, this.offset + 2) !== "${"
+    ) {
+      this.advance()
+    }
+    return s === this.offset
+      ? undefined
+      : {
+          type: "Literal",
+          loc: { start, end: this.getPosition() },
+          value: this.input.slice(s, this.offset)
+        }
   }
 }
