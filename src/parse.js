@@ -28,6 +28,10 @@ acorn.plugins.hsml = function(instance, opts) {
   })
 }
 
+const VOIDS = "area base br col embed hr img input keygen link meta param source track wbr".split(
+  " "
+)
+
 exports.parse = function parse(input, options) {
   return new exports.Parser(input, options).parse()
 }
@@ -207,10 +211,12 @@ exports.Parser = class Parser {
     let children = null
     if (!this.eat("/>")) {
       this.expect(">")
-      this.skipWhitespace()
-      children = this.parseList(this.parseChild, this.skipWhitespace)
-      this.skipWhitespace()
-      this.expect(`</${tagName}>`)
+      if (!VOIDS.includes(tagName.toLowerCase())) {
+        this.skipWhitespace()
+        children = this.parseList(this.parseChild, this.skipWhitespace)
+        this.skipWhitespace()
+        this.expect(`</${tagName}>`)
+      }
     }
     return {
       type: "HSMLElement",

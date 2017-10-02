@@ -132,6 +132,27 @@ describe("parse", () => {
     })
   })
 
+  it("allows void elements to close with > instead of />", () => {
+    assert.deepEqual(
+      removeLoc(
+        parse(
+          "<area><base><br><col><embed><hr><img><input><keygen><link><meta><param><source><track><wbr>"
+        )
+      ),
+      {
+        type: "HSML",
+        body: "area base br col embed hr img input keygen link meta param source track wbr"
+          .split(" ")
+          .map(tagName => ({
+            type: "HSMLElement",
+            tagName,
+            attributes: [],
+            children: null
+          }))
+      }
+    )
+  })
+
   it("parses child text", () => {
     assert.deepEqual(removeLoc(parse("<a>hello<b/>world</a>")), {
       type: "HSML",
