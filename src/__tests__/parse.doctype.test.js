@@ -6,7 +6,7 @@ const { parse } = require("../parse")
 describe("parse doctype", () => {
   it("parses a doctype", () => {
     assert.deepEqual(parse("<!doctype html>"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 1, column: 15 }
@@ -27,7 +27,7 @@ describe("parse doctype", () => {
 
   it("parses case insensitively", () => {
     assert.deepEqual(parse("<!DocType html>"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 1, column: 15 }
@@ -56,7 +56,7 @@ describe("parse doctype", () => {
         {}
       ),
       {
-        type: "HSML",
+        type: "HSMLDocument",
         loc: {
           start: { line: 1, column: 0 },
           end: { line: 4, column: 5 }
@@ -81,6 +81,22 @@ describe("parse doctype", () => {
 
   it("throws when appears as a child", () => {
     assert.throws(() => parse("<a><!doctype html></a>"))
+  })
+
+  it("throws when appears twice", () => {
+    assert.throws(() => parse("<!doctype html><!doctype html>"))
+  })
+
+  it("throws when appears after an element", () => {
+    assert.throws(() => parse("<a></a><!doctype html>"))
+  })
+
+  it("throws when appears after text", () => {
+    assert.throws(() => parse("hi<!doctype html>"))
+  })
+
+  it("can appear after a comment", () => {
+    assert.doesNotThrow(() => parse("<!-- --><!doctype html>"))
   })
 
   it("throws when unclosed before end of input", () => {

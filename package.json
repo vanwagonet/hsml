@@ -1,5 +1,5 @@
 {
-  "name": "hsml",
+  "name": "HSMLDocument",
   "version": "1.0.0",
   "description": "Toy html-based templates",
   "main": "index.js",

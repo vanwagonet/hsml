@@ -31,6 +31,7 @@ acorn.plugins.hsml = function(instance, opts) {
 const VOIDS = "area base br col embed hr img input keygen link meta param source track wbr".split(
   " "
 )
+const CDATAS = "script style".split(" ")
 
 exports.parse = function parse(input, options) {
   return new exports.Parser(input, options).parse()
@@ -43,6 +44,7 @@ exports.Parser = class Parser {
     this.column = 0
     this.input = input
     this.options = { ...options }
+    this.isDoctypeAllowed = true
   }
 
   advance(count = 1) {
@@ -133,13 +135,13 @@ exports.Parser = class Parser {
   }
 
   parse() {
-    this.skipWhitespace()
     const start = this.getPosition()
-    const body = this.parseList(this.parseTopElement, this.skipWhitespace)
-    const end = this.getPosition()
     this.skipWhitespace()
+    const body = this.parseList(this.parseTopElement, this.skipWhitespace)
+    this.skipWhitespace()
+    const end = this.getPosition()
     return {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: { start, end },
       body
     }
@@ -157,8 +159,9 @@ exports.Parser = class Parser {
 
   parseDoctype() {
     if (
+      !this.isDoctypeAllowed ||
       this.input.slice(this.offset, this.offset + 9).toLowerCase() !==
-      "<!doctype"
+        "<!doctype"
     )
       return
     const s = this.offset
@@ -177,6 +180,7 @@ exports.Parser = class Parser {
       throw new Error("Invalid doctype")
     }
     this.advance()
+    this.isDoctypeAllowed = false
     return {
       type: "HSMLDoctype",
       loc: { start, end: this.getPosition() },
@@ -211,13 +215,17 @@ exports.Parser = class Parser {
     let children = null
     if (!this.eat("/>")) {
       this.expect(">")
-      if (!VOIDS.includes(tagName.toLowerCase())) {
+      if (CDATAS.includes(tagName.toLowerCase())) {
+        children = this.parseImplicitCData(tagName)
+        this.expect(`</${tagName}>`)
+      } else if (!VOIDS.includes(tagName.toLowerCase())) {
         this.skipWhitespace()
         children = this.parseList(this.parseChild, this.skipWhitespace)
         this.skipWhitespace()
         this.expect(`</${tagName}>`)
       }
     }
+    this.isDoctypeAllowed = false
     return {
       type: "HSMLElement",
       loc: { start, end: this.getPosition() },
@@ -287,6 +295,22 @@ exports.Parser = class Parser {
     )
   }
 
+  parseImplicitCData(tagName) {
+    const start = this.getPosition()
+    const s = this.offset
+    let e = this.input.indexOf(`</${tagName}>`, s)
+    if (e < 0) e = this.input.length
+    if (s === e) return []
+    this.advance(e - s)
+    return [
+      {
+        type: "Literal",
+        loc: { start, end: this.getPosition() },
+        value: this.input.slice(s, this.offset)
+      }
+    ]
+  }
+
   parsePlaceholder() {
     if (!this.eat("${")) return
     const parser = new acorn.Parser(
@@ -318,6 +342,7 @@ exports.Parser = class Parser {
       this.advance()
     }
     if (s === this.offset) return
+    this.isDoctypeAllowed = false
     return {
       type: "Literal",
       loc: { start, end: this.getPosition() },

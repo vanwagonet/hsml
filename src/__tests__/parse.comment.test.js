@@ -6,7 +6,7 @@ const { parse } = require("../parse")
 describe("parse comment", () => {
   it("parses a comment", () => {
     assert.deepEqual(parse("<!-- comment -->"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 1, column: 16 }

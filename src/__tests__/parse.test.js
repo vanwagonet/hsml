@@ -15,7 +15,7 @@ function removeLoc(obj) {
 describe("parse", () => {
   it("parses a self-closing element", () => {
     assert.deepEqual(parse("<tag-name />"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 1, column: 12 }
@@ -37,7 +37,7 @@ describe("parse", () => {
 
   it("parses an empty element", () => {
     assert.deepEqual(parse("<tag-name></tag-name>"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 1, column: 21 }
@@ -59,7 +59,7 @@ describe("parse", () => {
 
   it("parses sibling elements", () => {
     assert.deepEqual(parse("<a/>\n<b/>"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 2, column: 4 }
@@ -91,7 +91,7 @@ describe("parse", () => {
 
   it("parses children elements", () => {
     assert.deepEqual(parse("<a><b/><c/></a>"), {
-      type: "HSML",
+      type: "HSMLDocument",
       loc: {
         start: { line: 1, column: 0 },
         end: { line: 1, column: 15 }
@@ -140,7 +140,7 @@ describe("parse", () => {
         )
       ),
       {
-        type: "HSML",
+        type: "HSMLDocument",
         body: "area base br col embed hr img input keygen link meta param source track wbr"
           .split(" ")
           .map(tagName => ({
@@ -155,7 +155,7 @@ describe("parse", () => {
 
   it("parses child text", () => {
     assert.deepEqual(removeLoc(parse("<a>hello<b/>world</a>")), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -182,9 +182,25 @@ describe("parse", () => {
     })
   })
 
+  it("parses top level text", () => {
+    assert.deepEqual(removeLoc(parse("hello\n${place}")), {
+      type: "HSMLDocument",
+      body: [
+        {
+          type: "Literal",
+          value: "hello"
+        },
+        {
+          type: "Identifier",
+          name: "place"
+        }
+      ]
+    })
+  })
+
   it("parses each line of child text individually", () => {
     assert.deepEqual(removeLoc(parse("<a>\nhello\nworld\n</a>")), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -207,7 +223,7 @@ describe("parse", () => {
 
   it("parses child text placeholder expressions", () => {
     assert.deepEqual(removeLoc(parse("<a>hello ${ place }</a>")), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -244,9 +260,9 @@ describe("parse", () => {
       />`
       ),
       {
-        type: "HSML",
+        type: "HSMLDocument",
         loc: {
-          start: { line: 1, column: 1 },
+          start: { line: 1, column: 0 },
           end: { line: 12, column: 8 }
         },
         body: [

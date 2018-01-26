@@ -14,7 +14,7 @@ function removeLoc(obj) {
 describe("parse attribute", () => {
   it("parses implicit boolean attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input checked disabled />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -45,7 +45,7 @@ describe("parse attribute", () => {
 
   it("parses explicit boolean attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input disabled=false />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -71,7 +71,7 @@ describe("parse attribute", () => {
     assert.deepEqual(
       removeLoc(parse(`<n b=0b01 o=0o7 h=0xaf d=123.456 p=+1 n=-2></n>`)),
       {
-        type: "HSML",
+        type: "HSMLDocument",
         body: [
           {
             type: "HSMLElement",
@@ -162,7 +162,7 @@ describe("parse attribute", () => {
         )
       ),
       {
-        type: "HSML",
+        type: "HSMLDocument",
         body: [
           {
             type: "HSMLElement",
@@ -227,7 +227,7 @@ describe("parse attribute", () => {
 
   it("parses regular expression attributes", () => {
     assert.deepEqual(removeLoc(parse(`<reg exp=/./gi />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -261,7 +261,7 @@ describe("parse attribute", () => {
 
   it("allows regex that looks like close inside parens", () => {
     assert.deepEqual(removeLoc(parse(`<reg exp=(/>/) />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -289,7 +289,7 @@ describe("parse attribute", () => {
 
   it("allows regex that looks like close inside function", () => {
     assert.deepEqual(removeLoc(parse(`<reg exp=() => {/>/} />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -333,7 +333,7 @@ describe("parse attribute", () => {
 
   it("parses identifier attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input expression=a />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -356,7 +356,7 @@ describe("parse attribute", () => {
 
   it("parses member expression attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input expression=a.b />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -387,7 +387,7 @@ describe("parse attribute", () => {
 
   it("parses function call attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input value=fn() />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -414,7 +414,7 @@ describe("parse attribute", () => {
 
   it("parses function expression attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input value=function*(){} />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -445,7 +445,7 @@ describe("parse attribute", () => {
 
   it("parses arrow function attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input value=async () => {} />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -476,7 +476,7 @@ describe("parse attribute", () => {
 
   it("parses array literal attributes", () => {
     assert.deepEqual(removeLoc(parse(`<a array=[ 'a' ] />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -505,7 +505,7 @@ describe("parse attribute", () => {
 
   it("parses object literal attributes", () => {
     assert.deepEqual(removeLoc(parse(`<o obj={ p } />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
@@ -544,7 +544,7 @@ describe("parse attribute", () => {
 
   it("parses parenthetical expression attributes", () => {
     assert.deepEqual(removeLoc(parse(`<input expression=(5 / 6 > 1) />`)), {
-      type: "HSML",
+      type: "HSMLDocument",
       body: [
         {
           type: "HSMLElement",
